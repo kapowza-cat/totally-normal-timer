@@ -37,6 +37,7 @@ class FloatingTimer:
         self.isTimerPaused = False
         self.start_of_pause = 0
         self.timer_mode = 's'
+        self.should_stop = False
 
         # Calculate X and Y coordinates
         padding_right = 0
@@ -97,58 +98,45 @@ class FloatingTimer:
         self.timer_mode = input
         if input == 's':
             self.start_time = time.time()
-            self.update_timer()
+            self.time_tracker()
         else:
             thread2 = threading.Thread(target=self.input2, daemon=True)
             thread2.start()
 
     def input2(self):
-        # Safely set initial display text on the main thread
         self.root.after(0, lambda: self.label.config(text="--:--:--"))
-
-        # Stores up to 6 digits (HHMMSS)
         digits = []
 
         while True:
             event = keyboard.read_event()
 
-            # Only process KEY_DOWN events
             if event.event_type != keyboard.KEY_DOWN:
                 continue
 
             key_name = event.name
 
-            # 1. Exit on ESC
             if key_name == "esc":
                 self.root.after(0, self.root.destroy)
                 return
 
-            # 2. Confirm and start timer on ENTER
             if key_name == "enter":
                 if digits:  # Only proceed if at least one digit was entered
                     break
                 continue
 
-            # 3. Handle BACKSPACE (remove last entered digit)
             if key_name == "backspace":
                 if digits:
                     digits.pop()
 
-            # 4. Handle DIGITS (Standard numbers & Numpad)
             else:
-                # Check if the last character of key_name is a digit (handles '1' and 'keypad 1')
                 last_char = key_name[-1]
                 if last_char.isdigit() and len(digits) < 6:
                     digits.append(last_char)
-
-            # Build the padded HH:MM:SS format (e.g., typing '1', '2', '3' -> '--:01:23')
             padded = ["-"] * (6 - len(digits)) + digits
             formatted_str = f"{padded[0]}{padded[1]}:{padded[2]}{padded[3]}:{padded[4]}{padded[5]}"
 
-            # Update the Tkinter label safely on the main thread
             self.root.after(0, lambda text=formatted_str: self.label.config(text=text))
 
-        # Calculate total timer duration in seconds once ENTER is pressed
         time_str = "".join(digits).zfill(6)  # Ensures 6 characters (e.g., '000123')
         hours = int(time_str[0:2])
         minutes = int(time_str[2:4])
@@ -157,8 +145,7 @@ class FloatingTimer:
         self.total_seconds = (hours * 3600) + (minutes * 60) + seconds
         self.start_time = time.time()
 
-        # Start the countdown on the main loop
-        self.root.after(0, self.update_timer)
+        self.time_tracker()
 
     def pause_timer(self, *args):
         if not self.isTimerPaused:
@@ -171,6 +158,7 @@ class FloatingTimer:
             self.start_time += paused_for
 
     def end(self):
+        self.should_stop = True
         self.label.config(text="00:00")
         time.sleep(1)
         while True:
@@ -180,7 +168,8 @@ class FloatingTimer:
             time.sleep(0.5)
 
     def update_timer(self):
-        elapsed = int(time.time() - self.start_time)
+        #elapsed = int(time.time() - self.start_time)
+        elapsed = self.mainTimeCount
         if self.timer_mode == 't':       
             elapsed = self.total_seconds - elapsed
             if elapsed == 0:
@@ -195,9 +184,24 @@ class FloatingTimer:
                 self.label.config(text=f"{hours:d}:{minutes:02d}:{seconds:02d}")
             else:
                 self.label.config(text=f"{minutes:02d}:{seconds:02d}")
-            self.root.after(1000, self.update_timer)
-        else:
-            self.root.after(1000, self.update_timer)
+
+    def send_update_simple(self):
+        self.updateThread = threading.Thread(target=self.update_timer, daemon=True)
+        self.updateThread.start()
+
+    def time_tracker(self):
+        self.mainTimeCount = 0
+        self.send_update_simple()
+        next_tick = time.perf_counter() + 1
+        while True:
+            remaining = next_tick - time.perf_counter()
+            if remaining < 0.9:
+                remaining = 1
+            time.sleep(remaining)
+            if self.should_stop == True:
+                break
+            self.mainTimeCount += 1
+            self.send_update_simple()
 
 
 
