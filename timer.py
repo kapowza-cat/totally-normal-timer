@@ -1,11 +1,14 @@
 import time
+import random
 import tkinter as tk
 import ctypes
 import platform
 import keyboard
 import threading
+import video_jumpscare
+import stress
 
-# Tell Windows to render at native DPI resolution (crisp text)
+# Tell Windows to render at native DPI resolution
 if platform.system() == "Windows":
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(1)  # Per-monitor DPI aware
@@ -34,10 +37,14 @@ class FloatingTimer:
         screen_height = self.root.winfo_screenheight()
 
         # Variable init
+        # visibility
         self.isTimerPaused = False
         self.start_of_pause = 0
         self.timer_mode = 's'
         self.should_stop = False
+        self.wackymode = False
+        self.lengthOfSecond = 1
+        self.isStressTestRunning = False
 
         # Calculate X and Y coordinates
         padding_right = 0
@@ -92,11 +99,16 @@ class FloatingTimer:
             if event.event_type == keyboard.KEY_DOWN:
                 if event.name == 'esc':
                     self.root.destroy()
-                if event.name == 't' or event.name == 's':
+                if event.name == 't' or event.name == 's' or event.name == 'S':
                     input = event.name
                     break
         self.timer_mode = input
         if input == 's':
+            self.wackymode = False
+            self.start_time = time.time()
+            self.time_tracker()
+        elif input == 'S':
+            self.wackymode = True
             self.start_time = time.time()
             self.time_tracker()
         else:
@@ -121,6 +133,8 @@ class FloatingTimer:
 
             if key_name == "enter":
                 if digits:  # Only proceed if at least one digit was entered
+                    if keyboard.is_pressed('shift'):
+                        self.wackymode = True
                     break
                 continue
 
@@ -168,7 +182,8 @@ class FloatingTimer:
             time.sleep(0.5)
 
     def update_timer(self):
-        #elapsed = int(time.time() - self.start_time)
+        if self.should_stop:
+            return
         elapsed = self.mainTimeCount
         if self.timer_mode == 't':       
             elapsed = self.total_seconds - elapsed
@@ -189,19 +204,76 @@ class FloatingTimer:
         self.updateThread = threading.Thread(target=self.update_timer, daemon=True)
         self.updateThread.start()
 
+    def wacky(self, clock):
+        if (random.randint(1,100) <= 90 and False):
+            self.send_update_simple()
+            return
+
+        choice = random.randint(1,100)
+        
+
+        if choice <= 10: #up
+            self.lengthOfSecond = self.lengthOfSecond / 1.5
+        elif choice <= 20: #down
+            self.lengthOfSecond = self.lengthOfSecond * 1.5
+        elif choice <= 30: #freeze
+            time.sleep(self.lengthOfSecond * 5)
+            self.mainTimeCount += 3
+        elif choice <= 35: # swap
+            self.mainTimeCount -= 1
+            if self.timer_mode == 't':
+                clock = self.total_seconds - self.mainTimeCount
+            else:
+                clock = self.mainTimeCount
+
+            minutes = (clock // 60) % 60
+            seconds = clock % 60
+
+            swapped_clock = (seconds * 60) + minutes
+            diff = swapped_clock - clock
+            
+            if self.timer_mode == 't':
+                self.mainTimeCount -= diff
+            else:
+                self.mainTimeCount += diff
+        elif choice <= 40: #jumpscare
+            video_jumpscare.video_jumpscare("explosion.mp4")
+        elif choice <= 45: #cpu go boom
+            stress.stress_cpu(15)
+        elif choice <= 50: #draw cards until
+            while not random.randint(1,100) == 1:
+                self.mainTimeCount += 1
+                self.send_update_simple()
+                time.sleep(0.02)
+        elif choice <= 55: #lay cards until
+            while not random.randint(1,100) == 1:
+                self.mainTimeCount -= 1
+                self.send_update_simple()
+                time.sleep(0.02)
+        
+        if self.lengthOfSecond < 0.01:
+            self.lengthOfSecond = 0.01
+        if self.lengthOfSecond > 2.5:
+            self.lengthOfSecond = 2.5
+        
+
+        self.send_update_simple()
+
     def time_tracker(self):
         self.mainTimeCount = 0
         self.send_update_simple()
-        next_tick = time.perf_counter() + 1
+
         while True:
-            remaining = next_tick - time.perf_counter()
-            if remaining < 0.9:
-                remaining = 1
-            time.sleep(remaining)
+            time.sleep(self.lengthOfSecond) # most accurate it's going to get
+
             if self.should_stop == True:
                 break
             self.mainTimeCount += 1
-            self.send_update_simple()
+
+            if self.wackymode:
+                self.wacky(self.mainTimeCount)
+            else:
+                self.send_update_simple()
 
 
 
