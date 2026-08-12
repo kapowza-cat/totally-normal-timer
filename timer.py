@@ -2,14 +2,15 @@ import time
 import random
 import tkinter as tk
 import ctypes
-import platform
+from platform import system
 import keyboard
 import threading
 import video_jumpscare
 import stress
+from win11toast import toast
 
 # Tell Windows to render at native DPI resolution
-if platform.system() == "Windows":
+if system() == "Windows":
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(1)  # Per-monitor DPI aware
     except Exception:
@@ -38,6 +39,12 @@ class FloatingTimer:
 
         # Variable init
         # visibility
+        #
+        #
+        #
+        #
+        #
+        #
         self.isTimerPaused = False
         self.start_of_pause = 0
         self.timer_mode = 's'
@@ -69,7 +76,7 @@ class FloatingTimer:
         )
         self.label.pack(expand=True)
 
-        # Dragging & Exit bindings
+        # bindings
         self.root.bind("<Button-1>", self.start_drag)
         self.root.bind("<B1-Motion>", self.do_drag)
         self.root.bind("<Button-2>", lambda e: self.root.destroy())
@@ -205,11 +212,12 @@ class FloatingTimer:
         self.updateThread.start()
 
     def wacky(self, clock):
-        if (random.randint(1,100) <= 90 and False):
+        if (random.randint(1,100) <= 90):
             self.send_update_simple()
             return
 
         choice = random.randint(1,100)
+        choice = 45
         
 
         if choice <= 10: #up
@@ -241,15 +249,21 @@ class FloatingTimer:
         elif choice <= 45: #cpu go boom
             stress.stress_cpu(15)
         elif choice <= 50: #draw cards until
-            while not random.randint(1,100) == 1:
+            while not random.randint(1,70) == 1:
                 self.mainTimeCount += 1
                 self.send_update_simple()
                 time.sleep(0.02)
         elif choice <= 55: #lay cards until
-            while not random.randint(1,100) == 1:
+            while not random.randint(1,70) == 1:
                 self.mainTimeCount -= 1
                 self.send_update_simple()
                 time.sleep(0.02)
+        elif choice <= 77:
+            self.mainTimeCount -= random.randint(3,10)
+        elif choice <= 99:
+            self.mainTimeCount += random.randint(3,10)
+        else:
+            toast("The game", "More specifically, the one you just lost")
         
         if self.lengthOfSecond < 0.01:
             self.lengthOfSecond = 0.01

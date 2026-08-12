@@ -1,11 +1,18 @@
 import cv2
-import numpy as np
+import sys
 import os
+import numpy as np
 from ffpyplayer.player import MediaPlayer
 
 def video_jumpscare(path):
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
     video_path = path
-    window_name = "You just lost the game"
+    video_path = os.path.join(base_path,video_path)
+    window_name = "jumpscare"
 
     cap = cv2.VideoCapture(video_path)
     player = MediaPlayer(video_path)
@@ -43,7 +50,7 @@ def video_jumpscare(path):
         pass
 
     cap.release()
-    cv2.destroyWindow("You just lost the game")
+    cv2.destroyWindow("jumpscare")
 
 
 
