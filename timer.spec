@@ -5,7 +5,7 @@ a = Analysis(
     ['timer.py'],
     pathex=[],
     binaries=[],
-    datas=[('stress.py', '.'), ('video_jumpscare.py', '.'), ('explosion.mp4', '.')],
+    datas=[('explosion.mp4', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

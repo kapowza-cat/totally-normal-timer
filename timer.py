@@ -2,12 +2,16 @@ import time
 import random
 import tkinter as tk
 import ctypes
+import multiprocessing
 from platform import system
 import keyboard
 import threading
-import video_jumpscare
-import stress
 from win11toast import toast
+import cv2
+import sys
+import os
+import numpy as np
+from ffpyplayer.player import MediaPlayer
 
 # Tell Windows to render at native DPI resolution
 if system() == "Windows":
@@ -19,21 +23,143 @@ if system() == "Windows":
         except Exception:
             pass
 
+#STRESS
+# the following functions are ai generated because i am lazy
+#
+#
+#
+
+def lucas_lehmer(p, stop_flag):
+    """
+    Tests if M_p = 2^p - 1 is prime using the Lucas-Lehmer algorithm.
+    Mimics the core mathematical verification function of Prime95.
+    """
+    if p == 2:
+        return True
+    
+    # Mersenne number to test
+    m_p = (1 << p) - 1
+    
+    # Initial state
+    s = 4
+    
+    # Perform iterations (p - 2 times)
+    for _ in range(p - 2):
+        s = (s * s - 2) % m_p
+        if stop_flag.is_set():
+            break
+        
+    return s == 0
+
+def stress_test_worker(worker_id, stop_flag):
+    test_exponents = [9941, 11213, 19937, 21701, 23209, 44497]
+    
+    idx = 0
+    while not stop_flag.is_set():
+        p = test_exponents[idx % len(test_exponents)]
+        
+        start_time = time.time()
+        is_prime = lucas_lehmer(p, stop_flag)
+        duration = time.time() - start_time
+        
+        idx += 1
+
+def stress_cpu(length):
+    cpu_count = multiprocessing.cpu_count()
+    
+    manager = multiprocessing.Manager()
+    stop_flag = manager.Event()
+    processes = []
+    
+    # Spawn a worker process for every logical CPU core
+    for i in range(cpu_count):
+        p = multiprocessing.Process(target=stress_test_worker, args=(i, stop_flag))
+        processes.append(p)
+        p.start()
+        
+    try:
+        # Run the stress test until manually stopped or time has passed
+        start_time = time.perf_counter()
+        while True:
+            time.sleep(1)
+            if time.perf_counter() - start_time >= length:
+                raise KeyboardInterrupt
+    except KeyboardInterrupt:
+        stop_flag.set()
+        for p in reversed(processes):
+            p.join()
+
+#VIDEO_JUMPSCARE
+# same as before
+#
+#
+#
+#
+
+def video_jumpscare(path):
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    video_path = path
+    video_path = os.path.join(base_path,video_path)
+    window_name = "jumpscare"
+
+    cap = cv2.VideoCapture(video_path)
+    player = MediaPlayer(video_path)
+
+    cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
+    cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        audio_frame, val = player.get_frame()
+
+        if not ret or val == 'eof':
+            break  
+            
+        if val == 'paused':
+            continue
+
+        cv2.imshow(window_name, frame)
+        
+        if cv2.waitKey(30) & 0xFF == ord('q'):
+            break
+
+    try:
+        black_screen = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        cv2.imshow(window_name, black_screen)
+        cv2.waitKey(1)
+    except:
+        pass
+
+
+    try:
+        player.set_pause(True)
+        player.close_player()
+    except:
+        pass
+
+    cap.release()
+    cv2.destroyWindow("jumpscare")
+
+#now this is my code
 
 class FloatingTimer:
 
     def __init__(self, root):
         self.root = root
 
-        # Keep window always on top & remove title bar
+        # alwaysontop
         self.root.wm_attributes("-topmost", True)
         self.root.overrideredirect(True)
 
-        # Define window dimensions
+        # window dimensions
         window_width = 180
         window_height = 60
 
-        # Get screen dimensions
+        # dimensions
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
 
@@ -53,20 +179,20 @@ class FloatingTimer:
         self.lengthOfSecond = 1
         self.isStressTestRunning = False
 
-        # Calculate X and Y coordinates
+        # x/y
         padding_right = 0
-        taskbar_offset = 60  # Adjust if your taskbar is taller/shorter
+        taskbar_offset = 60  # change this if needed
 
         x_coordinate = screen_width - window_width - padding_right
         y_coordinate = screen_height - window_height - taskbar_offset
 
-        # Set geometry: "WidthxHeight+X+Y"
+        #WidthxHeight+X+Y
         self.root.geometry(
             f"{window_width}x{window_height}+{x_coordinate}+{y_coordinate}"
         )
         self.root.configure(bg="#333333")
 
-        # Configure display label
+        #display label
         self.label = tk.Label(
             root,
             text="",
@@ -139,7 +265,7 @@ class FloatingTimer:
                 return
 
             if key_name == "enter":
-                if digits:  # Only proceed if at least one digit was entered
+                if digits:
                     if keyboard.is_pressed('shift'):
                         self.wackymode = True
                     break
@@ -158,7 +284,7 @@ class FloatingTimer:
 
             self.root.after(0, lambda text=formatted_str: self.label.config(text=text))
 
-        time_str = "".join(digits).zfill(6)  # Ensures 6 characters (e.g., '000123')
+        time_str = "".join(digits).zfill(6)  # 6 digits
         hours = int(time_str[0:2])
         minutes = int(time_str[2:4])
         seconds = int(time_str[4:6])
@@ -169,6 +295,7 @@ class FloatingTimer:
         self.time_tracker()
 
     def pause_timer(self, *args):
+        self.startofpause = time.perf_counter()
         if not self.isTimerPaused:
             self.isTimerPaused = True
             self.start_of_pause = time.time()
@@ -191,7 +318,7 @@ class FloatingTimer:
     def update_timer(self):
         if self.should_stop:
             return
-        elapsed = self.mainTimeCount
+        elapsed = int(self.mainTimeCount)
         if self.timer_mode == 't':       
             elapsed = self.total_seconds - elapsed
             if elapsed == 0:
@@ -201,11 +328,12 @@ class FloatingTimer:
         seconds = elapsed % 60
         minutes = (elapsed // 60) % 60
         hours = elapsed // 3600
-        if not self.isTimerPaused:
-            if elapsed >= 3600:
-                self.label.config(text=f"{hours:d}:{minutes:02d}:{seconds:02d}")
-            else:
-                self.label.config(text=f"{minutes:02d}:{seconds:02d}")
+        if self.isTimerPaused:
+            return
+        if elapsed >= 3600:
+            self.label.config(text=f"{hours:d}:{minutes:02d}:{seconds:02d}")
+        else:
+            self.label.config(text=f"{minutes:02d}:{seconds:02d}")
 
     def send_update_simple(self):
         self.updateThread = threading.Thread(target=self.update_timer, daemon=True)
@@ -217,7 +345,6 @@ class FloatingTimer:
             return
 
         choice = random.randint(1,100)
-        choice = 45
         
 
         if choice <= 10: #up
@@ -245,9 +372,9 @@ class FloatingTimer:
             else:
                 self.mainTimeCount += diff
         elif choice <= 40: #jumpscare
-            video_jumpscare.video_jumpscare("explosion.mp4")
+            video_jumpscare("explosion.mp4")
         elif choice <= 45: #cpu go boom
-            stress.stress_cpu(15)
+            stress_cpu(15)
         elif choice <= 50: #draw cards until
             while not random.randint(1,70) == 1:
                 self.mainTimeCount += 1
@@ -258,9 +385,9 @@ class FloatingTimer:
                 self.mainTimeCount -= 1
                 self.send_update_simple()
                 time.sleep(0.02)
-        elif choice <= 77:
+        elif choice <= 77: #skip
             self.mainTimeCount -= random.randint(3,10)
-        elif choice <= 99:
+        elif choice <= 99: #also skip
             self.mainTimeCount += random.randint(3,10)
         else:
             toast("The game", "More specifically, the one you just lost")
@@ -278,7 +405,15 @@ class FloatingTimer:
         self.send_update_simple()
 
         while True:
-            time.sleep(self.lengthOfSecond) # most accurate it's going to get
+            self.startofsecond = time.perf_counter()
+
+            time.sleep(self.lengthOfSecond) 
+            # hurts to use time.sleep 
+            # but it's the most accurate and simple method i've found so far
+
+            if self.isTimerPaused:
+                while self.isTimerPaused:
+                    time.sleep(0.05)
 
             if self.should_stop == True:
                 break
